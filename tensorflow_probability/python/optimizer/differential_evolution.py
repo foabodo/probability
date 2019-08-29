@@ -124,6 +124,8 @@ def one_step(
     population_values=None,
     differential_weight=0.5,
     crossover_prob=0.9,
+    transformer=None,
+    transform_bounds=None,
     seed=None,
     name=None):
   """Performs one step of the differential evolution algorithm.
@@ -157,6 +159,18 @@ def one_step(
     crossover_prob: Real scalar `Tensor`. Must be between 0 and 1. The
       probability of recombination per site.
       Default value: 0.9
+    transformer: A Python callable that individually transforms members of
+      the recombined population resulting from the binary crossover
+      operation so that their values fall within the range specified by
+      transform_bounds. Both transformer and transform_bounds must not be
+      None to have an effect.
+      Default value: None.
+    transform_bounds: A Python list of 2-tuples (e.g. [(0., 200.), (0.,
+      40.)]), with the first and second element of each tuple representing
+      the lower and upper bound values of the corresponding model
+      parameter being estimated, respectively. Both transformer and
+      transform_bounds must not be None to have an effect.
+      Default value: None.
     seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
       applied.
       Default value: None.
@@ -192,6 +206,8 @@ def one_step(
                                    population_size,
                                    mutants,
                                    crossover_prob,
+                                   transformer,
+                                   transform_bounds,
                                    seed=seed_stream())
     candidate_values = objective_function(*candidates)
     if population_values is None:
@@ -223,6 +239,8 @@ def minimize(objective_function,
              position_tolerance=1e-8,
              differential_weight=0.5,
              crossover_prob=0.9,
+             transformer=None,
+             transform_bounds=None,
              seed=None,
              name=None):
   """Applies the Differential evolution algorithm to minimize a function.
@@ -329,6 +347,18 @@ def minimize(objective_function,
     crossover_prob: Real scalar `Tensor`. Must be between 0 and 1. The
       probability of recombination per site.
       Default value: 0.9
+    transformer: A Python callable that individually transforms each
+      member of the recombined population resulting from the binary
+      crossover operation so that their values fall within the range
+      specified by transform_bounds. Both transformer and transform_bounds
+      must not be None to have an effect.
+      Default value: None.
+    transform_bounds: A Python list of 2-tuples (e.g. [(0., 200.), (0.,
+      40.)]), with the first and second element of each tuple representing
+      the lower and upper bound values of the corresponding model
+      parameter being estimated, respectively. Both transformer and
+      transform_bounds must not be None to have an effect.
+      Default value: None.
     seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
       applied.
       Default value: None.
@@ -407,6 +437,8 @@ def minimize(objective_function,
           population_values=loop_vars.population_values,
           differential_weight=differential_weight,
           crossover_prob=crossover_prob,
+          transformer=transformer,
+          transform_bounds=transform_bounds,
           seed=seed)
       converged = _check_convergence(next_population,
                                      next_population_values,
@@ -608,6 +640,8 @@ def _binary_crossover(population,
                       population_size,
                       mutants,
                       crossover_prob,
+                      transformer,
+                      transform_bounds,
                       seed):
   """Performs recombination by binary crossover for the current population.
 
@@ -668,6 +702,10 @@ def _binary_crossover(population,
         do_binary_crossover, x=mutant_part_flat, y=pop_part_flat)
     recombinant = tf.reshape(recombinant_flat, tf.shape(input=population_part))
     recombinants.append(recombinant)
+  if not (transformer is None or transform_bounds is None):
+    recombinants = [transformer(recombinant, transform_bound)
+                    for (recombinant, transform_bound)
+                    in zip(recombinants, transform_bounds)]
   return recombinants
 
 
